@@ -20,3 +20,6 @@ checkpoints/
 # OS / editor
 Thumbs.db
 .vscode/
+
+# images
+*.png
