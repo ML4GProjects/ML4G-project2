@@ -1,0 +1,22 @@
+# uv / Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large, available from Kaggle)
+data/
+*.h5ad
+*.h5
+
+# Outputs / models
+outputs/
+checkpoints/
+*.pt
+*.pth
+
+# OS / editor
+Thumbs.db
+.vscode/
