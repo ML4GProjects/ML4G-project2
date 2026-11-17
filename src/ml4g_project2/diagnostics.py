@@ -1,15 +1,17 @@
-"""Error diagnostics for the patient-grouped CV in sc_classify.py: per-class Brier contribution + confusion matrix.
+"""Diagnostics for sc_classify.py: per-class Brier contribution + confusion matrix, and canonical marker dot plots.
 
 Run from the repo root: uv run python -m ml4g_project2.diagnostics
 """
 from pathlib import Path
 
+import anndata as ad
 import matplotlib.pyplot as plt
 import pandas as pd
+import scanpy as sc
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
-from ml4g_project2.sc_classify import run_cv
+from ml4g_project2.sc_classify import CANONICAL_MARKERS, DATA, lognorm, run_cv
 
 PLOTS = Path("plots")
 
@@ -41,5 +43,23 @@ def plot_errors(y, groups, classes, oof, patient="P2"):
     print(f"saved {PLOTS / 'cv_rf_errors.png'}")
 
 
+def plot_markers():
+    """Canonical marker expression per cell type, and for myofibroblasts split by patient."""
+    adata = ad.read_h5ad(DATA / "train_sc.h5ad")
+    adata.X = lognorm(adata.X)
+    PLOTS.mkdir(exist_ok=True)
+
+    sc.pl.dotplot(adata, CANONICAL_MARKERS, groupby="cell_type", standard_scale="var", show=False)
+    plt.savefig(PLOTS / "markers_by_cell_type.png", dpi=150, bbox_inches="tight")
+
+    # are the "myofibroblasts" smooth-muscle-like or T-cell-like, and does that differ by patient?
+    genes = {k: CANONICAL_MARKERS[k] for k in ["Myofibroblasts", "Fibroblasts", "T_cells", "NK_cells"]}
+    myo = adata[adata.obs["cell_type"] == "Myofibroblasts"]
+    sc.pl.dotplot(myo, genes, groupby="patient", show=False)
+    plt.savefig(PLOTS / "markers_myofibroblasts_by_patient.png", dpi=150, bbox_inches="tight")
+    print(f"saved {PLOTS / 'markers_by_cell_type.png'}, {PLOTS / 'markers_myofibroblasts_by_patient.png'}")
+
+
 if __name__ == "__main__":
     plot_errors(*run_cv())
+    plot_markers()
