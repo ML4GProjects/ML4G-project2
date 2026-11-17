@@ -1,0 +1,33 @@
+# Canonical marker genes for the 9 cell types in train_sc.h5ad.
+# markers: present in the 7,725-gene panel; missing_from_panel: textbook markers that are not.
+source: Hand-compiled textbook markers, consistent with PanglaoDB and CellMarker 2.0 (not exported from them).
+species: human
+
+cell_types:
+  T_cells:
+    markers: [CD3D, CD3E, CD3G, CD2, TRAC, CD8A, CD4, IL7R]
+    missing_from_panel: []
+  NK_cells:
+    markers: [NKG7, GNLY, KLRD1, FCGR3A, PRF1, GZMB]
+    missing_from_panel: [KLRF1, NCAM1]
+  B_cells:
+    markers: [MS4A1, CD79A, CD79B, BANK1]
+    missing_from_panel: [CD19, PAX5]
+  Plasmablasts:
+    markers: [JCHAIN, MZB1, IGHG1, XBP1, PRDM1]
+    missing_from_panel: [SDC1]
+  Myeloid_cells:
+    markers: [CD14, LYZ, CD68, CSF1R, ITGAX, C1QA]
+    missing_from_panel: []
+  Mast_cells:
+    markers: [TPSAB1, TPSB2, CPA3, KIT, MS4A2, HDC]
+    missing_from_panel: []
+  Fibroblasts:
+    markers: [COL1A1, COL1A2, DCN, LUM, PDGFRA, FAP]
+    missing_from_panel: []
+  Myofibroblasts:
+    markers: [ACTA2, TAGLN, PDGFRB]
+    missing_from_panel: [MYH11, CNN1, DES]
+  Endothelial_cells:
+    markers: [PECAM1, VWF, CLDN5, EMCN]
+    missing_from_panel: [CDH5, KDR]

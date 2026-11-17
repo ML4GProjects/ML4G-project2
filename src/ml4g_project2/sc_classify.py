@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
+import yaml
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import brier_score_loss
 from sklearn.model_selection import StratifiedGroupKFold
@@ -17,19 +18,9 @@ DATA = Path("data")
 N_SPLITS = 5  # 5 train patients -> each fold holds out exactly one patient
 N_MARKERS = 10  # top marker genes per cell type (best in sweep_markers.py), picked on the training fold only
 
-# textbook markers (PanglaoDB / CellMarker style); only genes present in the panel.
-# missing from panel: KLRF1 NCAM1 CD19 PAX5 SDC1 MYH11 CNN1 DES CDH5 KDR
-CANONICAL_MARKERS = {
-    "T_cells": ["CD3D", "CD3E", "CD3G", "CD2", "TRAC", "CD8A", "CD4", "IL7R"],
-    "NK_cells": ["NKG7", "GNLY", "KLRD1", "FCGR3A", "PRF1", "GZMB"],
-    "B_cells": ["MS4A1", "CD79A", "CD79B", "BANK1"],
-    "Plasmablasts": ["JCHAIN", "MZB1", "IGHG1", "XBP1", "PRDM1"],
-    "Myeloid_cells": ["CD14", "LYZ", "CD68", "CSF1R", "ITGAX", "C1QA"],
-    "Mast_cells": ["TPSAB1", "TPSB2", "CPA3", "KIT", "MS4A2", "HDC"],
-    "Fibroblasts": ["COL1A1", "COL1A2", "DCN", "LUM", "PDGFRA", "FAP"],
-    "Myofibroblasts": ["ACTA2", "TAGLN", "PDGFRB"],
-    "Endothelial_cells": ["PECAM1", "VWF", "CLDN5", "EMCN"],
-}
+# textbook markers per cell type (source and genes missing from the panel are in the yaml)
+_markers = yaml.safe_load((Path(__file__).parent / "canonical_markers.yaml").read_text())
+CANONICAL_MARKERS = {ct: v["markers"] for ct, v in _markers["cell_types"].items()}
 
 
 def lognorm(X, target_sum=1e4):
@@ -44,6 +35,11 @@ def marker_genes(X, y, n=N_MARKERS):
     sc.tl.rank_genes_groups(a, "y")
     names = pd.DataFrame(a.uns["rank_genes_groups"]["names"]).head(n)
     return np.unique(names.to_numpy().astype(int))
+
+
+def make_rf():
+    """The cell-type classifier, shared by CV and the final submission (predict.py)."""
+    return RandomForestClassifier(n_estimators=200, n_jobs=-1, random_state=0)
 
 
 def run_cv(n_markers=N_MARKERS, fixed_genes=None):
@@ -64,7 +60,7 @@ def run_cv(n_markers=N_MARKERS, fixed_genes=None):
     scores = []
     oof = np.zeros((len(y), len(classes)))  # out-of-fold probabilities
     for fold, (tr, te) in enumerate(cv.split(X, y, groups)):
-        rf = RandomForestClassifier(n_estimators=200, n_jobs=-1, random_state=0)
+        rf = make_rf()
         if fixed_genes is not None:
             genes = fixed_idx
         else:
