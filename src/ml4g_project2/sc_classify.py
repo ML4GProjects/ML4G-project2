@@ -15,7 +15,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 
 DATA = Path("data")
 N_SPLITS = 5  # 5 train patients -> each fold holds out exactly one patient
-N_MARKERS = 20  # top marker genes per cell type, picked on the training fold only
+N_MARKERS = 10  # top marker genes per cell type (best in sweep_markers.py), picked on the training fold only
 
 # textbook markers (PanglaoDB / CellMarker style); only genes present in the panel.
 # missing from panel: KLRF1 NCAM1 CD19 PAX5 SDC1 MYH11 CNN1 DES CDH5 KDR
