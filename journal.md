@@ -6,8 +6,37 @@ Findings and how to reproduce them. All commands run from the repo root; data in
 
 - **Validation:** leave-one-patient-out CV over the 5 training patients (P1–P4, P7; `StratifiedGroupKFold` grouped by `patient`). Test patients (P5, P6, P8) are unseen, so random cell splits overestimate.
 - **Metric:** task Brier score (sum over 9 cell types of squared errors), pooled over all cells (single-cell) or bulk replicates. Competition score S = ½ B_cell/B0_cell + ½ B_bulk/B0_bulk; pass at S ≤ 0.30144.
-- **Comparing settings:** paired per-patient differences to the best setting (mean ± SEM). The unpaired SEM (~0.015) mostly reflects P2 being hard.
+- **Comparing settings:** paired per-patient differences to the best setting (mean ± SEM over the 5 patients). The unpaired SEM (~0.015) mostly reflects P2 being hard. RF sweep values are pooled only (no per-patient cache).
 - **Features:** log1p(counts per 10k). Marker genes = top n per cell type from scanpy `rank_genes_groups`, picked inside each fold on training cells only.
+
+## Timeline
+
+Order in which things were tried (✔ kept, ✘ dropped; numbers: pooled B_cell, B_bulk, or local S; Δ = paired change vs the incumbent ± SEM over patients).
+
+**Decision rule (paired one-SE rule):** a new setting replaces the incumbent only if it is better by more than one paired SEM. Among settings within one SEM of the best, keep the simplest or most regularized one. Ties therefore go to the simpler model.
+
+```mermaid
+flowchart TD
+    subgraph cells [Cell classifier]
+        A[RF, all genes<br/>0.135] --> B[✘ balanced class weights<br/>worse for every patient]
+        A --> C[✘ RF, textbook markers<br/>0.105, beaten by data-driven markers]
+        A --> D[✔ RF, top-n rank_genes markers<br/>sweep 3–100: best 10 → 0.090]
+        D --> E[✔ LR, markers × C grid → 100 markers, C=0.003, 0.070<br/>Δ vs RF −0.018 ± 0.003: beyond 1 SEM<br/>200 markers within 1 SEM but not simpler]
+        E --> F[✘ LR, all genes, 0.079<br/>Δ +0.010 ± 0.003: worse beyond 1 SEM]
+        E --> G[✘ Harmony + LR, 0.070<br/>Δ +0.001 ± 0.003: tie, adds a step]
+        G --> H[✘ scANVI latent + LR, 0.070<br/>Δ +0.000 ± 0.003: tie, adds a model]
+        H --> I[✘ temperature scaling, 0.0704<br/>no gain]
+    end
+    subgraph bulk [Bulk deconvolution]
+        J[✔ mean predicted probabilities<br/>0.017] --> K[✘ per-cell-type correction, 0.014<br/>Δ −0.004 ± 0.004: within 1 SEM, hurts P2]
+        K --> L[✔ sample-specific signatures + NNLS, 0.0059<br/>Δ vs mean proba −0.014 ± 0.008: beyond 1 SEM<br/>α=50: most shrinkage among α within 1 SEM]
+        L --> M[✘ global signature, 0.036<br/>Δ vs mean proba +0.017 ± 0.017: worse]
+    end
+    D --> J
+    J --> S1[Submission 1<br/>local S 0.147, Kaggle 0.163]
+    E --> S2
+    L --> S2[Submission 2<br/>local S 0.0775, Kaggle 0.142]
+```
 
 ## Reproduce
 
@@ -69,7 +98,7 @@ Embeddings and per-cell CV probabilities are cached in `experiments/out/` and re
 | all (7,725) | 0.079 | 0.079 | 0.081 | | | | |
 
 - Optimum on a diagonal: more genes need smaller C, levelling off at C ≈ 0.003 from ~50 markers. Peak at 100–200 markers; all genes is worse for every patient (+0.010 ± 0.003).
-- **Chosen: LR, 100 markers per type (~765 genes), C = 0.003** (pooled 0.0702). Paired one-SE rule: only 200 markers at C = 0.003 is within one SEM (+0.0009 ± 0.0016), and it is not simpler.
+- **Chosen: LR, 100 markers per type (~765 genes), C = 0.003** (pooled 0.0702; per-patient mean 0.077 ± 0.015). Paired one-SE rule: only 200 markers at C = 0.003 is within one SEM (+0.0009 ± 0.0016), and it is not simpler.
 
 | Held-out patient | RF, 10 markers | LR, 100 markers, C = 0.003 |
 |---|---|---|
@@ -79,20 +108,21 @@ Embeddings and per-cell CV probabilities are cached in `experiments/out/` and re
 | P4 | 0.086 | 0.075 |
 | P7 | 0.077 | 0.050 |
 | **Pooled** | **0.090** | **0.070** (−22%) |
+| Paired change (± SEM) | | −0.018 ± 0.003, better for 5/5 |
 
 ### Batch correction and other attempts (vs chosen LR, 0.0702)
 
-| Approach | Pooled B_cell |
-|---|---|
-| PCA (50) on markers + LR | 0.081 |
-| Harmony (batch = sample) + LR, C = 0.1 | 0.0699 (tie) |
-| Harmony (batch = patient) + LR | 0.0716 |
-| Harmony + RF | 0.088 |
-| scANVI (markers), own predictions | 0.193 (overconfident) |
-| scANVI (markers) latent + LR, C = 1 | 0.0703 (tie) |
-| scANVI (markers) latent + RF | 0.097 |
-| scANVI (all genes) latent + LR | 0.077 |
-| Temperature scaling of chosen LR (T ≈ 0.93) | 0.0704 (no gain) |
+| Approach | Pooled B_cell | Paired change (± SEM) |
+|---|---|---|
+| PCA (50) on markers + LR, C = 0.1 | 0.081 | +0.013 ± 0.007 |
+| Harmony (batch = sample) + LR, C = 0.1 | 0.0699 (tie) | +0.001 ± 0.003 |
+| Harmony (batch = patient) + LR, C = 0.1 | 0.0716 | +0.003 ± 0.003 |
+| Harmony (sample) + RF | 0.088 | +0.018 ± 0.003 |
+| scANVI (markers), own predictions | 0.193 (overconfident) | +0.143 ± 0.050 |
+| scANVI (markers) latent + LR, C = 1 | 0.0703 (tie) | +0.000 ± 0.003 |
+| scANVI (markers) latent + RF | 0.097 | +0.026 ± 0.005 |
+| scANVI (all genes) latent + LR, C = 1 | 0.077 | +0.006 ± 0.003 |
+| Temperature scaling of chosen LR (T ≈ 0.93) | 0.0704 (no gain) | n/a (not cached per patient) |
 
 In-fold marker selection already removes most patient effects; batch correction ties at best. RF is worse than LR on every embedding. The remaining error is most likely the myofibroblast/T and NK/T label overlap, not batch effects.
 
@@ -118,13 +148,16 @@ The classifier is not the bottleneck: the gap is single-cell vs bulk composition
 
 Correction fitted on the other patients' replicates: multiplicative `normalize(exp(θ)·p)` with ridge λ on θ, or additive mean offset.
 
+Bulk Brier (paired change vs no correction ± SEM):
+
 | Correction | RF 10 | LR 100 |
 |---|---|---|
 | none | 0.0174 | 0.0186 |
-| additive | 0.0130 | 0.0157 |
-| mult λ = 0 / 0.01 | 0.0283 / 0.0193 | 0.0601 / 0.0263 |
-| mult λ = 0.1 | **0.0139** | 0.0177 |
-| mult λ = 1 | 0.0141 | 0.0165 |
+| additive | 0.0130 (−0.005 ± 0.005) | 0.0157 (−0.003 ± 0.007) |
+| mult λ = 0 | 0.0283 (+0.013 ± 0.014) | 0.0601 (+0.037 ± 0.026) |
+| mult λ = 0.01 | 0.0193 (+0.002 ± 0.007) | 0.0263 (+0.008 ± 0.011) |
+| mult λ = 0.1 | **0.0139** (−0.004 ± 0.004) | 0.0177 (−0.001 ± 0.006) |
+| mult λ = 1 | 0.0141 (−0.004 ± 0.002) | 0.0165 (−0.002 ± 0.002) |
 
 Helps P1, P3, P4 but hurts P2 every time (e.g. RF 0.006 → 0.017). Superseded by NNLS.
 
@@ -151,11 +184,13 @@ Helps P1, P3, P4 but hurts P2 every time (e.g. RF 0.006 → 0.017). Superseded b
 
 ## Competition score
 
+SEMs are over the 5 per-patient values (P2: S = 0.206, others 0.04–0.09). No SEM for submission 1: P1's B0_bulk is tiny (0.017), so its per-patient S (1.02) swamps the spread.
+
 Local CV terms are ½·B/B0 with B0 from the reference (training-fold frequencies); the task computes B0 on test rows, so local and Kaggle values are not directly comparable.
 
 | Submission | Pipeline | Cell term | Bulk term | Local S | Kaggle |
 |---|---|---|---|---|---|
 | 1 (`0000e39`) | RF 10 markers + mean proba | 0.063 | 0.084 | 0.147 | 0.163 |
-| 2 (`868764c`, current) | LR 100, C = 0.003 + NNLS α = 50 | 0.049 | 0.028 | 0.0775 | 0.142 |
+| 2 (`868764c`, current) | LR 100, C = 0.003 + NNLS α = 50 | 0.049 ± 0.012 | 0.028 ± 0.019 | 0.0775 ± 0.029 | 0.142 |
 
 The cell-model change alone predicts ~−0.014 of the −0.021 gain, so NNLS likely gave little on test, consistent with test samples behaving like P2. Candidate hedges: 75/25 blend with mean probabilities; grouping T/NK/myofibroblasts in the NNLS and splitting by sc proportions.
