@@ -6,7 +6,7 @@ Findings and how to reproduce them. All commands run from the repo root; data in
 
 - **Validation:** leave-one-patient-out CV over the 5 training patients (P1–P4, P7; `StratifiedGroupKFold` grouped by `patient`). Test patients (P5, P6, P8) are unseen, so random cell splits overestimate.
 - **Metric:** task Brier score (sum over 9 cell types of squared errors), pooled over all cells (single-cell) or bulk replicates. Competition score S = ½ B_cell/B0_cell + ½ B_bulk/B0_bulk; pass at S ≤ 0.30144.
-- **Comparing settings:** paired per-patient differences to the best setting (mean ± SEM over the 5 patients). The unpaired SEM (~0.015) mostly reflects P2 being hard. RF sweep values are pooled only (no per-patient cache).
+- **Comparing settings (paired change):** for each held-out patient, d = Brier(new) − Brier(reference); report mean(d) ± SEM(d) over the 5 patients. Pairing cancels difficulty shared by both settings: the unpaired SEM (~0.015) mostly reflects P2 being hard. Patients are weighted equally, so mean(d) can differ slightly from the difference of pooled (cell-weighted) scores. RF sweep values are pooled only (no per-patient cache).
 - **Features:** log1p(counts per 10k). Marker genes = top n per cell type from scanpy `rank_genes_groups`, picked inside each fold on training cells only.
 
 ## Timeline
