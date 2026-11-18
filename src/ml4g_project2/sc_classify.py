@@ -1,4 +1,4 @@
-"""Patient-grouped stratified k-fold CV of a random forest cell-type classifier, scored by Brier score.
+"""Patient-grouped stratified k-fold CV of a cell-type classifier (random forest or logistic regression), scored by Brier score.
 
 Run from the repo root: uv run python -m ml4g_project2.sc_classify
 """
@@ -11,8 +11,11 @@ import scanpy as sc
 import scipy.sparse as sp
 import yaml
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
 from sklearn.model_selection import StratifiedGroupKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 DATA = Path("data")
 N_SPLITS = 5  # 5 train patients -> each fold holds out exactly one patient
@@ -42,10 +45,19 @@ def make_rf():
     return RandomForestClassifier(n_estimators=200, n_jobs=-1, random_state=0)
 
 
-def run_cv(n_markers=N_MARKERS, fixed_genes=None):
+def make_lr(C=1.0):
+    """Multinomial logistic regression on per-gene scaled features (lbfgs, deterministic)."""
+    return make_pipeline(
+        StandardScaler(with_mean=False),  # scale genes; with_mean=False keeps X sparse
+        LogisticRegression(C=C, max_iter=1000),  # multinomial by default for >2 classes
+    )
+
+
+def run_cv(n_markers=N_MARKERS, fixed_genes=None, make_model=make_rf):
     """Print per-fold Brier scores; return labels, patient groups, classes and out-of-fold probabilities.
 
     fixed_genes: list of gene names to use in every fold instead of per-fold marker selection.
+    make_model: zero-argument function returning a fresh classifier (e.g. make_rf, make_lr).
     """
     adata = ad.read_h5ad(DATA / "train_sc.h5ad")
     X = lognorm(adata.X)
@@ -60,16 +72,16 @@ def run_cv(n_markers=N_MARKERS, fixed_genes=None):
     scores = []
     oof = np.zeros((len(y), len(classes)))  # out-of-fold probabilities
     for fold, (tr, te) in enumerate(cv.split(X, y, groups)):
-        rf = make_rf()
+        model = make_model()
         if fixed_genes is not None:
             genes = fixed_idx
         else:
             genes = marker_genes(X[tr], y[tr], n_markers)  # no peeking at the held-out patient
-        rf.fit(X[tr][:, genes], y[tr])
+        model.fit(X[tr][:, genes], y[tr])
 
         # a rare cell type can be missing from a training fold -> align columns to all classes
         proba = np.zeros((len(te), len(classes)))
-        proba[:, np.searchsorted(classes, rf.classes_)] = rf.predict_proba(X[te][:, genes])
+        proba[:, np.searchsorted(classes, model.classes_)] = model.predict_proba(X[te][:, genes])
         oof[te] = proba
 
         score = brier_score_loss(y[te], proba, labels=classes)

@@ -2,23 +2,29 @@
 
 1. Normalize counts: log1p(counts per 10k) per cell.
 2. Pick the top N_MARKERS marker genes per cell type on the training cells (scanpy rank_genes_groups).
-3. Train the random forest on those genes; predict a probability distribution for every test cell.
+3. Train a multinomial logistic regression (C=C_LR) on those genes; predict a probability
+   distribution for every test cell.
 4. Bulk deconvolution: each test bulk sample gets the mean predicted distribution of the test cells
    from its single-cell sample (all replicates of a sample get the same prediction).
 5. Write results/submission.csv with the same ids and columns as sample_submission.csv.
 
 Before predicting, cv_score() reports the competition score S on leave-one-patient-out CV.
+N_MARKERS and C_LR were chosen by a leave-one-patient-out sweep of single-cell Brier (one-SE rule, paired).
 Run from the repo root: uv run python -m ml4g_project2.predict
 """
+from functools import partial
 from pathlib import Path
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 
-from ml4g_project2.sc_classify import DATA, N_MARKERS, lognorm, make_rf, marker_genes, run_cv
+from ml4g_project2.sc_classify import DATA, lognorm, make_lr, marker_genes, run_cv
 
 RESULTS = Path("results")
+N_MARKERS = 100  # marker genes per cell type
+C_LR = 0.003  # inverse regularization strength of the logistic regression
+make_model = partial(make_lr, C=C_LR)
 
 
 def brier(pred, target):
@@ -26,13 +32,13 @@ def brier(pred, target):
     return ((np.asarray(pred) - np.asarray(target)) ** 2).sum(axis=1)
 
 
-def cv_score():
+def cv_score(make_model=make_model, n_markers=N_MARKERS):
     """Competition score S = 1/2 Bcell/B0cell + 1/2 Bbulk/B0bulk, on leave-one-patient-out CV.
 
     The references mimic the task's: B0cell predicts the training-fold cell-type frequencies for every
     held-out cell, B0bulk predicts the mean bulk proportions of the other patients.
     """
-    y, groups, classes, oof = run_cv()
+    y, groups, classes, oof = run_cv(n_markers, make_model=make_model)
     sample = ad.read_h5ad(DATA / "train_sc.h5ad", backed="r").obs["sample"].astype(str).to_numpy()
     onehot = (y[:, None] == classes).astype(float)
     bulk = pd.read_csv(DATA / "train_bulk_props.csv", index_col="id")[classes]
@@ -71,9 +77,9 @@ def main():
     genes = marker_genes(X_train, y, N_MARKERS)
     print(f"{len(genes)} marker genes ({N_MARKERS} per cell type)")
 
-    rf = make_rf()
-    rf.fit(X_train[:, genes], y)
-    cells = pd.DataFrame(rf.predict_proba(X_test[:, genes]), index=test.obs_names, columns=rf.classes_)
+    model = make_model()
+    model.fit(X_train[:, genes], y)
+    cells = pd.DataFrame(model.predict_proba(X_test[:, genes]), index=test.obs_names, columns=model.classes_)
 
     # 4: bulk deconvolution from the test cells of the same sample
     per_sample = cells.groupby(test.obs["sample"].astype(str).to_numpy()).mean()
