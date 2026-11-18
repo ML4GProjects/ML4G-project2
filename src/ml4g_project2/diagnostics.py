@@ -11,6 +11,7 @@ import scanpy as sc
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
+from ml4g_project2.predict import N_MARKERS, make_model
 from ml4g_project2.sc_classify import CANONICAL_MARKERS, DATA, lognorm, run_cv
 
 PLOTS = Path("plots")
@@ -39,8 +40,8 @@ def plot_errors(y, groups, classes, oof, patient="P2"):
         plt.setp(ax.get_xticklabels(), ha="right")
     plt.tight_layout()
     PLOTS.mkdir(exist_ok=True)
-    plt.savefig(PLOTS / "cv_rf_errors.png", dpi=150, bbox_inches="tight")
-    print(f"saved {PLOTS / 'cv_rf_errors.png'}")
+    plt.savefig(PLOTS / "cv_errors.png", dpi=150, bbox_inches="tight")
+    print(f"saved {PLOTS / 'cv_errors.png'}")
 
 
 def plot_markers():
@@ -61,5 +62,5 @@ def plot_markers():
 
 
 if __name__ == "__main__":
-    plot_errors(*run_cv())
+    plot_errors(*run_cv(N_MARKERS, make_model=make_model))  # current predict.py model
     plot_markers()

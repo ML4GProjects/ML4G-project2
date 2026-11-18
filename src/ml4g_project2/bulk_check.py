@@ -11,11 +11,12 @@ import numpy as np
 import pandas as pd
 
 from ml4g_project2.diagnostics import PLOTS
+from ml4g_project2.predict import N_MARKERS, make_model
 from ml4g_project2.sc_classify import DATA, run_cv
 
 
 def main():
-    y, groups, classes, oof = run_cv()
+    y, groups, classes, oof = run_cv(N_MARKERS, make_model=make_model)  # current predict.py model
     sample = ad.read_h5ad(DATA / "train_sc.h5ad", backed="r").obs["sample"].astype(str).to_numpy()
 
     bulk = pd.read_csv(DATA / "train_bulk_props.csv", index_col="id")[classes]
@@ -47,15 +48,15 @@ def main():
     print("\nmean:")
     print(mae.mean().round(4).to_string())
 
-    # scatter: classifier counts vs bulk, one point per (replicate, cell type)
-    pred = estimates["classifier counts (argmax)"].loc[bulk_sample].to_numpy()
+    # scatter: mean predicted probabilities (what predict.py submits) vs bulk, one point per (replicate, cell type)
+    pred = estimates["classifier mean proba"].loc[bulk_sample].to_numpy()
     fig, ax = plt.subplots(figsize=(6, 6))
     for j, ct in enumerate(classes):
         ax.scatter(bulk.iloc[:, j], pred[:, j], label=ct, s=30)
     lim = max(bulk.to_numpy().max(), pred.max()) * 1.05
     ax.plot([0, lim], [0, lim], "k--", lw=0.8)
     ax.set(xlim=(0, lim), ylim=(0, lim), xlabel="bulk proportion (truth)",
-           ylabel="classifier count proportion", title="Per-sample sc classifier counts vs bulk")
+           ylabel="mean predicted probability", title="Per-sample sc classifier estimate vs bulk")
     ax.legend(fontsize=8, bbox_to_anchor=(1.01, 1), loc="upper left")
     plt.tight_layout()
     PLOTS.mkdir(exist_ok=True)

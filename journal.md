@@ -15,15 +15,17 @@ Findings and how to reproduce them. All commands run from the repo root; data in
 uv sync
 uv run python -m ml4g_project2.predict        # local CV score S + results/submission.csv
 uv run python -m ml4g_project2.sc_classify    # RF CV (single-cell Brier)
-uv run python -m ml4g_project2.diagnostics    # plots/cv_rf_errors.png, marker dot plots
-uv run python -m ml4g_project2.sweep_markers  # RF marker sweep, plots/sweep_markers.png
-uv run python -m ml4g_project2.bulk_check     # sc counts vs bulk proportions
+uv run python -m ml4g_project2.diagnostics    # current model: plots/cv_errors.png, marker dot plots
+uv run python -m ml4g_project2.sweep_markers  # RF marker sweep (historical), plots/sweep_markers.png
+uv run python -m ml4g_project2.bulk_check     # current model: sc estimate vs bulk, plots/bulk_check.png
 
 mkdir -p experiments/out/cache                # experiment outputs (git-ignored)
 uv run python experiments/lr_grid.py          # LR markers x C grid (~15 min)
 uv run python experiments/lr_diag.py          # LR 200/500 markers
 uv run python experiments/lr_allgenes.py      # LR on all genes
+uv run python experiments/plot_lr_sweep.py    # plots/sweep_lr.png from the LR CSVs
 uv run python experiments/temperature.py      # temperature scaling
+uv run python experiments/bulk_correction.py  # per-cell-type bulk correction
 uv run --with harmonypy==2.1.0 python experiments/harmony_exp.py
 uv run --with scvi-tools==1.5.2 python experiments/scanvi_exp.py       # MPS, ~10 min
 uv run --with scvi-tools==1.5.2 python experiments/scanvi_allgenes.py  # MPS
