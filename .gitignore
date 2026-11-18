@@ -23,3 +23,5 @@ Thumbs.db
 
 # images
 *.png
+# experiment outputs and caches (regenerable)
+experiments/out/
