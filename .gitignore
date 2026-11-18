@@ -6,11 +6,6 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data (large, available from Kaggle)
-data/
-*.h5ad
-*.h5
-
 # Outputs / models
 outputs/
 checkpoints/
@@ -21,7 +16,5 @@ checkpoints/
 Thumbs.db
 .vscode/
 
-# images
-*.png
 # experiment outputs and caches (regenerable)
 experiments/out/

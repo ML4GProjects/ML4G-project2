@@ -61,7 +61,7 @@ uv run --with scvi-tools==1.5.2 python experiments/scanvi_exp.py       # MPS, ~1
 uv run --with scvi-tools==1.5.2 python experiments/scanvi_allgenes.py  # MPS
 ```
 
-Embeddings and per-cell CV probabilities are cached in `experiments/out/` and reused when folds and genes match. On Apple GPU (MPS) run only one scANVI script at a time: two concurrent runs deadlocked.
+Embeddings and per-cell CV probabilities are cached in `experiments/out/` and reused when folds and genes match. On Apple GPU (MPS) run only one scANVI script at a time: two concurrent runs deadlocked. UMAP plots come from `data_exploration.ipynb`.
 
 ## Data findings
 
@@ -69,6 +69,10 @@ Embeddings and per-cell CV probabilities are cached in `experiments/out/` and re
 - UMAP: cell types form clean clusters, but split by patient within types. Patient and chemo status are confounded (each patient is all-pre or all-post).
 - Cell-cycle markers are mostly missing from the panel (16/43 S, 20/54 G2M genes) → phase calls are noise.
 - **"Myofibroblasts" are mislabelled-looking:** in P2, P4, P7 they express T cell markers (CD3D, CD2, TRAC, IL7R in ~50–57% of cells) and ACTA2 in only 11% (fibroblasts: 34%). In P3 they look like fibroblasts. P2 holds 172 of 343 myofibroblasts and 523 of 734 mast cells, which makes it the hardest patient.
+
+![UMAP by cell type, chemo, patient](plots/train_sc_umap.png)
+![Marker dot plot per cell type](plots/markers_by_cell_type.png)
+![Myofibroblast markers by patient](plots/markers_myofibroblasts_by_patient.png)
 - Low-depth cells err slightly more (lowest quintile 6.4% vs ~4%), mostly because T/NK/myofibroblasts have the lowest counts.
 
 ## Cell-type classifier
@@ -98,6 +102,8 @@ Embeddings and per-cell CV probabilities are cached in `experiments/out/` and re
 | all (7,725) | 0.079 | 0.079 | 0.081 | | | | |
 
 - Optimum on a diagonal: more genes need smaller C, levelling off at C ≈ 0.003 from ~50 markers. Peak at 100–200 markers; all genes is worse for every patient (+0.010 ± 0.003).
+
+![LR markers x C sweep](plots/sweep_lr.png)
 - **Chosen: LR, 100 markers per type (~765 genes), C = 0.003** (pooled 0.0702; per-patient mean 0.077 ± 0.015). Paired one-SE rule: only 200 markers at C = 0.003 is within one SEM (+0.0009 ± 0.0016), and it is not simpler.
 
 | Held-out patient | RF, 10 markers | LR, 100 markers, C = 0.003 |
@@ -126,6 +132,8 @@ Embeddings and per-cell CV probabilities are cached in `experiments/out/` and re
 
 In-fold marker selection already removes most patient effects; batch correction ties at best. RF is worse than LR on every embedding. The remaining error is most likely the myofibroblast/T and NK/T label overlap, not batch effects.
 
+![Chosen LR: per-type Brier contribution per patient, P2 confusion matrix](plots/cv_errors.png)
+
 ## Bulk deconvolution
 
 Validation: per held-out patient, its bulk replicates (12 in total, 2–3 per patient) are estimated from that patient's cells with out-of-fold probabilities.
@@ -143,6 +151,8 @@ Each bulk sample = mean predicted cell-type probabilities of its sample's cells.
 | Constant (mean train bulk) | 0.0742 |
 
 The classifier is not the bottleneck: the gap is single-cell vs bulk composition (T cells overestimated). LR mean probabilities are slightly worse here (0.0186).
+
+![Mean predicted probability (current LR) vs bulk proportion](plots/bulk_check.png)
 
 ### Per-cell-type correction (`experiments/bulk_correction.py`)
 
